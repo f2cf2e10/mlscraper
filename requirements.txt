@@ -1,0 +1,8 @@
+pydantic
+sqlalchemy
+pgvector
+psycopg2
+dependency-injector
+dotenv
+fastapi
+uvicorn
