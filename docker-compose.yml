@@ -1,0 +1,48 @@
+services:
+  postgres:
+    build: 
+      context: .  
+      dockerfile: postgresql.Dockerfile 
+    container_name: mlpapers-postgres
+    restart: unless-stopped 
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    container_name: mlpapers-minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped 
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # Web console
+    env_file:
+      - .env
+    volumes:
+      - minio_data:/data
+
+  mc-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    env_file:
+      - .env
+    entrypoint: >
+      /bin/sh -c "
+       sleep 5;
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+        mc mb local/papers || true;
+        mc event add local/papers arn:minio:sqs::papers:webhook \
+          --event put \
+          --suffix .pdf \
+          --addr http://0.0.0.0:8000/paper/process;
+        exit 0;
+      "
+
+volumes:
+  postgres_data:
+  minio_data:

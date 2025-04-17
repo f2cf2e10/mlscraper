@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from lib.domain.model import Paper, PaperCreate
+from lib.domain.model import Paper, PaperChunk, PaperCreate, SearchScorePaper
 
 
 class PaperRepository(ABC):
@@ -16,12 +16,16 @@ class PaperRepository(ABC):
         pass
 
     @abstractmethod
-    def update(self, paper: PaperCreate) -> Paper:
+    def update(self, paper_id: str, paper: Paper) -> Optional[Paper]:
         """Updates a paper"""
         pass
 
     @abstractmethod
-    def similarity_search(self, embedding: List[float]) -> List[Paper]:
+    def add_embedding(self, embedding: PaperChunk) -> Optional[PaperChunk]:
+        pass
+
+    @abstractmethod
+    def similarity_search(self, embedding: List[float]) -> List[SearchScorePaper]:
         """Finds similar chats to the embedding."""
         pass
 

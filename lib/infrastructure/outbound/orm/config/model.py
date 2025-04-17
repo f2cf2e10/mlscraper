@@ -1,5 +1,5 @@
-from sqlalchemy import ARRAY, TIMESTAMP, Column, String, Text
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import ARRAY, TIMESTAMP, Column, Integer, String, Text
+from sqlalchemy.orm import declarative_base, relationship
 from pgvector.sqlalchemy import Vector
 from datetime import datetime, timezone
 import uuid
@@ -9,6 +9,7 @@ Base = declarative_base()
 
 def generate_uuid():
     return str(uuid.uuid4())
+
 
 class Paper(Base):
     __tablename__ = "papers"
@@ -22,6 +23,19 @@ class Paper(Base):
     pdf = Column(Text, nullable=False)
     url = Column(Text, nullable=True)
     summary = Column(Text)
-    keywords = Column(ARRAY(String), default=[])
-    embedding = Column(Vector(768))
+    keywords = Column(String, default=[])
     created_at = Column(TIMESTAMP, default=datetime.now(timezone.utc))
+
+    chunks = relationship(
+        "PaperChunk", back_populates="paper", cascade="all, delete-orphan")
+
+
+class PaperChunk(Base):
+    __tablename__ = "paper_chunks"
+
+    id = Column(Integer, primary_key=True)
+    chunk_index = Column(Integer, nullable=False)  # e.g. 0, 1, 2, ...
+    embedding = Column(Vector(384), nullable=False)
+    created_at = Column(TIMESTAMP, default=datetime.now(timezone.utc))
+
+    paper = relationship("Paper", back_populates="chunks")

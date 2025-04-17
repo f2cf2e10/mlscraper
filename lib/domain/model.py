@@ -1,19 +1,22 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from lib.infrastructure.outbound.orm.config.model import Paper as PaperOrm
+from lib.infrastructure.outbound.orm.config.model import Paper as PaperOrm, PaperChunk as PaperChunkOrm
 
 
-class PaperCreate(BaseModel):
+class PaperMetadata(BaseModel):
     title: str
     authors: List[str] = []
     publication_date: datetime
-    pdf: str
     url: Optional[str] = None
     abstract: Optional[str] = None
     conference: Optional[str] = None
     summary: Optional[str] = None
-    keywords: List[str] = []
+    keywords: Optional[str] = None
+
+
+class PaperCreate(PaperMetadata):
+    pdf: str
 
     def to_entity(self) -> PaperOrm:
         entity = PaperOrm(title=self.title,
@@ -30,7 +33,6 @@ class PaperCreate(BaseModel):
 
 class Paper(PaperCreate):
     id: str
-    embedding = Optional[List[float]] = None
     created_at: datetime
 
     @classmethod
@@ -44,9 +46,12 @@ class Paper(PaperCreate):
                    url=entity.url,
                    summary=entity.summary,
                    keywords=entity.keywords,
-                   embedding=entity.embedding,
                    created_at=entity.created_at,
                    id=entity.id)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Paper":
+        return Paper(**{k: v for k, v in d.items() if hasattr(Paper, k)})
 
     def to_entity(self) -> PaperOrm:
         entity = PaperOrm(title=self.title,
@@ -58,7 +63,29 @@ class Paper(PaperCreate):
                           url=self.url,
                           summary=self.summary,
                           keywords=self.keywords,
-                          embedding=self.embedding,
                           created_at=self.created_at,
                           id=self.id)
         return entity
+
+
+class PaperChunk(BaseModel):
+    paper_id: str
+    chunk_index: int
+    embedding: List[float]
+
+    @classmethod
+    def from_entity(cls, entity: PaperChunkOrm) -> "PaperChunk":
+        return cls(paper_id=entity.paper_id,
+                   chunk_index=entity.chunk_index,
+                   embedding=entity.embedding)
+
+    def to_entity(self) -> PaperOrm:
+        entity = PaperOrm(paper_id=self.paper_id,
+                          chunk_index=self.chunk_index,
+                          embedding=self.embedding)
+        return entity
+
+
+class SearchScorePaper(BaseModel):
+    score: float
+    paper: Paper
