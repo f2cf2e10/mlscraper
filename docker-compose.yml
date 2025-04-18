@@ -11,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    network_mode: host
 
   minio:
     image: minio/minio
@@ -24,6 +25,7 @@ services:
       - .env
     volumes:
       - minio_data:/data
+    network_mode: host
 
   mc-init:
     image: minio/mc
@@ -34,14 +36,13 @@ services:
     entrypoint: >
       /bin/sh -c "
        sleep 5;
-        mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+        mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
         mc mb local/papers || true;
-        mc event add local/papers arn:minio:sqs::papers:webhook \
-          --event put \
-          --suffix .pdf \
-          --addr http://0.0.0.0:8000/paper/process;
+        mc event add local/papers arn:minio:sqs::papers:webhook --event put --suffix .pdf
+        mc event info local/papers;
         exit 0;
       "
+    network_mode: host
 
 volumes:
   postgres_data:

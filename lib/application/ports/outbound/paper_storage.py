@@ -4,7 +4,7 @@ from typing import IO
 
 class PaperStorage(ABC):
     @abstractmethod
-    def upload_file(self, key: str, file: IO[bytes]) -> bool:
+    def upload_file(self, key: str, content: IO[bytes]) -> bool:
         """ Uploads file to storage """
         pass
 

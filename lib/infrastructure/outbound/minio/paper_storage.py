@@ -1,26 +1,26 @@
+from io import BytesIO
 import json
+import logging
 from typing import IO
 from minio import Minio
 from sqlalchemy.orm import Session
 from minio.error import S3Error
 
 from lib.application.ports.outbound.paper_storage import PaperStorage
-from lib.application.dto.model import PaperMetadataDto
-
 
 class MinioPaperStorage(PaperStorage):
     def __init__(self, client: Minio, bucket_name: str):
         self.client = client
         self.bucket_name = bucket_name
 
-    def upload_file(self, key: str, file: IO[bytes]) -> bool:
-        content = file.read()
+    def upload_file(self, key: str, content: IO[bytes]) -> bool:
         try:
-            self.client.put_object(
+            result = self.client.put_object(
                 self.bucket_name,
                 f'{key}.pdf',
-                file,
-                len(content)
+                BytesIO(content),
+                len(content),
+                content_type="application/pdf"
             )
             return True
         except S3Error as e:

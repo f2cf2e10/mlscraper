@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import IO, List
 
-from lib.application.dto.model import PaperChunkCreateDto, PaperChunkDto, PaperCreateDto, PaperDto, SearchScorePaperDto
+from lib.application.dto.model import PaperChunkDto, PaperChunkDto, PaperCreateDto, PaperDto, SearchScorePaperDto
 
 
 class PaperCrudUseCase(ABC):
@@ -27,6 +27,10 @@ class PaperCrudUseCase(ABC):
         pass
 
     @abstractmethod
-    def add_embedding(self, chunk=PaperChunkCreateDto) -> PaperChunkDto:
+    def add_embedding(self, chunk: PaperChunkDto) -> PaperChunkDto:
         """ Updates paper with embeddings vector """
+        pass
+
+    @abstractmethod
+    def clean_embeddings(self, paper_id: str) -> bool:
         pass

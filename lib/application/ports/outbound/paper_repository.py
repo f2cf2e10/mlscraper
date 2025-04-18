@@ -25,6 +25,10 @@ class PaperRepository(ABC):
         pass
 
     @abstractmethod
+    def clean_embeddings(self, paper_id: str) -> bool:
+        pass
+
+    @abstractmethod
     def similarity_search(self, embedding: List[float]) -> List[SearchScorePaper]:
         """Finds similar chats to the embedding."""
         pass

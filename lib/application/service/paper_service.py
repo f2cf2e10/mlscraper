@@ -1,5 +1,5 @@
 from typing import IO, List
-from lib.application.dto.model import PaperChunkCreateDto, PaperChunkDto, PaperCreateDto, PaperDto, SearchScorePaperDto
+from lib.application.dto.model import PaperChunkDto, PaperChunkDto, PaperCreateDto, PaperDto, SearchScorePaperDto
 from lib.application.ports.inbound.embedding_usecase import EmbeddingUseCase
 from lib.application.ports.inbound.paper_crud_usecase import PaperCrudUseCase
 from lib.application.ports.inbound.paper_store_usecase import PaperStoreUseCase
@@ -32,13 +32,16 @@ class PaperService(PaperCrudUseCase, PaperStoreUseCase):
         entities = self.paper_repo.similarity_search(text_embeddings[0])
         return [SearchScorePaperDto.from_entity(e.paper) for e in entities]
 
-    def add_embedding(self, chunk=PaperChunkCreateDto) -> PaperChunkDto:
+    def add_embedding(self, chunk: PaperChunkDto) -> PaperChunkDto:
         entity = chunk.to_entity()
         saved_entity = self.paper_repo.add_embedding(entity)
         return PaperChunkDto.from_entity(saved_entity)
 
-    def upload(self, key: str, file: IO[bytes]) -> bool:
-        return self.paper_store.upload_file(key, file)
+    def clean_embeddings(self, paper_id: str) -> bool:
+        return self.paper_repo.clean_embeddings(paper_id)
+
+    def upload(self, key: str, content: IO[bytes]) -> bool:
+        return self.paper_store.upload_file(key, content)
 
     def download(self, key: str) -> IO[bytes]:
         return self.paper_store.get_file(key)

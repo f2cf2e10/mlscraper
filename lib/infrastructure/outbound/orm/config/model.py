@@ -1,4 +1,4 @@
-from sqlalchemy import ARRAY, TIMESTAMP, Column, Integer, String, Text
+from sqlalchemy import ARRAY, TIMESTAMP, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import declarative_base, relationship
 from pgvector.sqlalchemy import Vector
 from datetime import datetime, timezone
@@ -20,9 +20,7 @@ class Paper(Base):
     abstract = Column(Text)
     conference = Column(String)
     publication_date = Column(TIMESTAMP, nullable=False)
-    pdf = Column(Text, nullable=False)
     url = Column(Text, nullable=True)
-    summary = Column(Text)
     keywords = Column(String, default=[])
     created_at = Column(TIMESTAMP, default=datetime.now(timezone.utc))
 
@@ -37,5 +35,5 @@ class PaperChunk(Base):
     chunk_index = Column(Integer, nullable=False)  # e.g. 0, 1, 2, ...
     embedding = Column(Vector(384), nullable=False)
     created_at = Column(TIMESTAMP, default=datetime.now(timezone.utc))
-
+    paper_id = Column(String, ForeignKey("papers.id"), nullable=False) 
     paper = relationship("Paper", back_populates="chunks")

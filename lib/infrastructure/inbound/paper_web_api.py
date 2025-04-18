@@ -1,32 +1,34 @@
-import mimetypes
-from typing import List
+import logging
+from typing import List, Literal
 from fastapi import APIRouter, File, HTTPException, Depends, Request, Response, UploadFile
-from app.container import Container
-from lib.application.dto.model import PaperCreateDto, PaperDto
+from app.container import conferences, Container
+from lib.application.dto.model import PaperChunkDto, PaperCreateDto, PaperDto
 from lib.application.ports.inbound.embedding_usecase import EmbeddingUseCase
 from lib.application.ports.inbound.paper_crud_usecase import PaperCrudUseCase
+from lib.application.ports.inbound.paper_scraper_usecase import PaperScraperUseCase
 from lib.application.ports.inbound.paper_store_usecase import PaperStoreUseCase
 
 router = APIRouter()
 container = Container()
 
+logger = logging.getLogger("uvicorn")
+
 
 @router.post("/paper", response_model=PaperDto)
 async def add(paper: PaperCreateDto,
-              file: UploadFile = File(...),
-              paper_service: PaperCrudUseCase = Depends(lambda: container.paper_service())) -> PaperDto:
+              paper_service: PaperCrudUseCase = Depends(
+                  lambda: container.paper_service())) -> PaperDto:
     try:
         entity = paper_service.add(paper)
-        saved = paper_service.upload(paper.id, file)
-        if saved:
-            return entity
+        return entity
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/paper/{paper_id}", response_model=PaperDto)
 async def get(paper_id: str,
-              paper_service: PaperCrudUseCase = Depends(lambda: container.paper_service())) -> PaperDto:
+              paper_service: PaperCrudUseCase = Depends(
+                  lambda: container.paper_service())) -> PaperDto:
     try:
         entity = paper_service.get_by_id(paper_id)
         return entity
@@ -34,11 +36,31 @@ async def get(paper_id: str,
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/paper/{paper_id}/upload", response_model=PaperDto)
+async def add_file(paper_id: str,
+                   file: UploadFile = File(...),
+                   paper_service: PaperCrudUseCase = Depends(
+                       lambda: container.paper_service())) -> PaperDto:
+    try:
+        entity = paper_service.get_by_id(paper_id)
+        if not entity:
+            raise HTTPException(
+                status_code=404, detail=f"Paper {paper_id} not found.")
+        content = await file.read()
+        saved = paper_service.upload(entity.id, content)
+        if saved:
+            return entity
+        return entity
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/paper/{paper_id}/download", response_model=PaperDto)
 async def get_file(paper_id: str,
-                   paper_service: PaperStoreUseCase = Depends(lambda: container.paper_service())) -> Response:
+                   paper_service: PaperStoreUseCase = Depends(
+                       lambda: container.paper_service())) -> Response:
     try:
-        file = paper_service.download(paper_id)
+        file = paper_service.download(f"{paper_id}.pdf")
 
         # Return as a streamed response
         return Response(
@@ -59,17 +81,55 @@ async def process_file(request: Request,
                        embedding_service: EmbeddingUseCase = Depends(
                            lambda: container.embedding_service())) -> Response:
     prefix = "papers/"
+    suffix = ".pdf"
     payload = await request.json()
     records = payload.get("Records", [])
 
     for record in records:
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
-        file = paper_service.download(key)
+        logger.info(f"New file uploaded: bucket={bucket}, key={key}")
         paper_id = key[len(prefix):] if key.startswith(prefix) else key
-        embeddings = embedding_service.get_embeddings(file)
+        paper_id = paper_id[:-len(suffix)
+                            ] if paper_id.endswith(suffix) else paper_id
+        paper = paper_service.get_by_id(paper_id)
+        # COMMENTED: Not doing the whole file, this is too large, instead do the abstract only
+        # file = paper_service.download(key)
+        # embeddings = embedding_service.get_embeddings(file)
+        if not paper:
+            raise HTTPException(
+                status_code=404, detail=f"Paper {paper_id} not found.")
+        embeddings = embedding_service.embeddings(paper.abstract)
+        _ = paper_service.clean_embeddings(paper_id)
         for i, embedding in enumerate(embeddings):
-            _ = paper_service.add_embeddings(paper_id, embedding, i)
-        print(f"New file uploaded: bucket={bucket}, key={key}")
+            _ = paper_service.add_embedding(PaperChunkDto(
+                paper_id=paper_id,
+                chunk_index=i,
+                embedding=embedding))
+        logger.info(f"File processed: bucket={bucket}, key={key}")
 
-    return Response({"status": "ok"}, status_code=200)
+    return Response("ok", status_code=200)
+
+
+@router.post("/scrap/{conference}/{year}", response_model=PaperDto)
+async def add(year: str,
+              conference: str,
+              paper_service: PaperCrudUseCase = Depends(
+                  lambda: container.paper_service())) -> List[PaperDto]:
+    try:
+        if not conference in conferences:
+            raise HTTPException(
+                status_code=404, detail=f"Conference not found. Available conferences are {", ".join(conferences)}")
+        scraper_service: PaperScraperUseCase = container.scraper_service(
+            conference, year)
+        papers = scraper_service.list_papers()
+        entities = []
+        # for paper in papers:
+        #    entity = paper_service.add(paper)
+        #    content = scraper_service.download_paper_pdf(paper)
+        #    _ = paper_service.upload(entity.id, content)
+        #   entities += [entity]
+        # return entity
+        return papers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

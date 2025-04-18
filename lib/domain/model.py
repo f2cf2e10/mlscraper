@@ -4,19 +4,14 @@ from datetime import datetime
 from lib.infrastructure.outbound.orm.config.model import Paper as PaperOrm, PaperChunk as PaperChunkOrm
 
 
-class PaperMetadata(BaseModel):
+class PaperCreate(BaseModel):
     title: str
     authors: List[str] = []
     publication_date: datetime
     url: Optional[str] = None
     abstract: Optional[str] = None
     conference: Optional[str] = None
-    summary: Optional[str] = None
     keywords: Optional[str] = None
-
-
-class PaperCreate(PaperMetadata):
-    pdf: str
 
     def to_entity(self) -> PaperOrm:
         entity = PaperOrm(title=self.title,
@@ -24,9 +19,7 @@ class PaperCreate(PaperMetadata):
                           abstract=self.abstract,
                           conference=self.conference,
                           publication_date=self.publication_date,
-                          pdf=self.pdf,
                           url=self.url,
-                          summary=self.summary,
                           keywords=self.keywords)
         return entity
 
@@ -42,9 +35,7 @@ class Paper(PaperCreate):
                    abstract=entity.abstract,
                    conference=entity.conference,
                    publication_date=entity.publication_date,
-                   pdf=entity.pdf,
                    url=entity.url,
-                   summary=entity.summary,
                    keywords=entity.keywords,
                    created_at=entity.created_at,
                    id=entity.id)
@@ -59,9 +50,7 @@ class Paper(PaperCreate):
                           abstract=self.abstract,
                           conference=self.conference,
                           publication_date=self.publication_date,
-                          pdf=self.pdf,
                           url=self.url,
-                          summary=self.summary,
                           keywords=self.keywords,
                           created_at=self.created_at,
                           id=self.id)
@@ -79,10 +68,10 @@ class PaperChunk(BaseModel):
                    chunk_index=entity.chunk_index,
                    embedding=entity.embedding)
 
-    def to_entity(self) -> PaperOrm:
-        entity = PaperOrm(paper_id=self.paper_id,
-                          chunk_index=self.chunk_index,
-                          embedding=self.embedding)
+    def to_entity(self) -> PaperChunkOrm:
+        entity = PaperChunkOrm(paper_id=self.paper_id,
+                               chunk_index=self.chunk_index,
+                               embedding=self.embedding)
         return entity
 
 
