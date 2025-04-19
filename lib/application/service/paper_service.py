@@ -2,12 +2,11 @@ from typing import IO, List
 from lib.application.dto.model import PaperChunkDto, PaperChunkDto, PaperCreateDto, PaperDto, SearchScorePaperDto
 from lib.application.ports.inbound.embedding_usecase import EmbeddingUseCase
 from lib.application.ports.inbound.paper_crud_usecase import PaperCrudUseCase
-from lib.application.ports.inbound.paper_store_usecase import PaperStoreUseCase
 from lib.application.ports.outbound.paper_repository import PaperRepository
 from lib.application.ports.outbound.paper_storage import PaperStorage
 
 
-class PaperService(PaperCrudUseCase, PaperStoreUseCase):
+class PaperService(PaperCrudUseCase):
     def __init__(self, paper_repo: PaperRepository, paper_store: PaperStorage, embedding_service: EmbeddingUseCase):
         self.paper_repo = paper_repo
         self.paper_store = paper_store

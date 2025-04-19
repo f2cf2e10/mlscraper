@@ -1,30 +1,14 @@
 from abc import ABC, abstractmethod
-import io
-import logging
-from typing import IO, List
-
-import requests
-
-from lib.application.dto.model import PaperDto
-
-
-logger = logging.getLogger("uvicorn")
+from logging import Logger
+from typing import List
+from lib.application.dto.model import PaperCreateDto
 
 
 class PaperScraperUseCase(ABC):
     @abstractmethod
-    def list_papers(self) -> List[PaperDto]:
+    def extract_links(self, logger: Logger) -> List[str]:
         pass
 
-    def download_paper_pdf(self, paper: PaperDto) -> IO[bytes]:
-        if not paper.url:
-            logger.info(f"No PDF URL found for paper: {paper.title}")
-            return
-
-        try:
-            resp = requests.get(paper.url)
-            resp.raise_for_status()
-            logger.info(f"Successfully downloaded: {paper.title}")
-            return io.BytesIO(resp.content)
-        except Exception as e:
-            logger.error(f"Failed downloading: {paper.title}")
+    @abstractmethod
+    def process_link(self, link: str, logger: Logger) -> PaperCreateDto:
+        pass

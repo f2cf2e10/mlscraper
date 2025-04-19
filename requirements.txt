@@ -10,3 +10,4 @@ minio==7.2.15
 pymupdf==1.25.5
 python-multipart==0.0.20
 bs4==0.0.2
+openreview-py==1.48.1

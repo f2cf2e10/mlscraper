@@ -5,8 +5,6 @@ from app.container import conferences, Container
 from lib.application.dto.model import PaperChunkDto, PaperCreateDto, PaperDto
 from lib.application.ports.inbound.embedding_usecase import EmbeddingUseCase
 from lib.application.ports.inbound.paper_crud_usecase import PaperCrudUseCase
-from lib.application.ports.inbound.paper_scraper_usecase import PaperScraperUseCase
-from lib.application.ports.inbound.paper_store_usecase import PaperStoreUseCase
 
 router = APIRouter()
 container = Container()
@@ -57,7 +55,7 @@ async def add_file(paper_id: str,
 
 @router.get("/paper/{paper_id}/download", response_model=PaperDto)
 async def get_file(paper_id: str,
-                   paper_service: PaperStoreUseCase = Depends(
+                   paper_service: PaperCrudUseCase = Depends(
                        lambda: container.paper_service())) -> Response:
     try:
         file = paper_service.download(f"{paper_id}.pdf")
@@ -109,27 +107,3 @@ async def process_file(request: Request,
         logger.info(f"File processed: bucket={bucket}, key={key}")
 
     return Response("ok", status_code=200)
-
-
-@router.post("/scrap/{conference}/{year}", response_model=PaperDto)
-async def add(year: str,
-              conference: str,
-              paper_service: PaperCrudUseCase = Depends(
-                  lambda: container.paper_service())) -> List[PaperDto]:
-    try:
-        if not conference in conferences:
-            raise HTTPException(
-                status_code=404, detail=f"Conference not found. Available conferences are {", ".join(conferences)}")
-        scraper_service: PaperScraperUseCase = container.scraper_service(
-            conference, year)
-        papers = scraper_service.list_papers()
-        entities = []
-        # for paper in papers:
-        #    entity = paper_service.add(paper)
-        #    content = scraper_service.download_paper_pdf(paper)
-        #    _ = paper_service.upload(entity.id, content)
-        #   entities += [entity]
-        # return entity
-        return papers
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

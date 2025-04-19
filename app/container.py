@@ -9,10 +9,10 @@ from sqlalchemy.orm import sessionmaker
 
 from lib.application.ports.inbound.paper_scraper_usecase import PaperScraperUseCase
 from lib.application.service.embedding_service import EmbeddingService
-from lib.application.service.neurips_scraper_service import NeurIpsScraper
-from lib.application.service.openreview_scraper_service import OpenReviewScraper
+from lib.application.service.scraper.neurips_scraper_service import NeurIpsScraper
+from lib.application.service.scraper.openreview_scraper_service import OpenReviewScraper
 from lib.application.service.paper_service import PaperService
-from lib.application.service.pmlr_scraper_service import PmlrScraper
+from lib.application.service.scraper.pmlr_scraper_service import PmlrScraper
 from lib.infrastructure.outbound.minio.paper_storage import MinioPaperStorage
 from lib.infrastructure.outbound.orm.paper_repository import SQLAlchemyPaperRepository
 
@@ -21,9 +21,9 @@ load_dotenv()
 
 class Conferences(str, Enum):
     NeurIPS = "NeurIPS"
-    ICML = "ICML"
+    ICLR = "ICLR"
     PMLR = "PMLR"
-conferences = ["NeurIPS", "ICML", "PMLR"]
+conferences = ["NeurIPS", "ICLR", "PMLR"]
 
 class Container(containers.DeclarativeContainer):
     database_url = providers.Singleton(str, os.getenv("DATABASE_URL"))
@@ -42,7 +42,7 @@ class Container(containers.DeclarativeContainer):
         database_url,
         pool_size=5,  # Pool size for SQLite
         max_overflow=10,  # Allow overflow connections
-        echo=True
+        echo=False
     )
     session_factory = providers.Singleton(
         sessionmaker,
