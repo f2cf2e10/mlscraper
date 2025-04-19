@@ -1,0 +1,23 @@
+from app.container import Container
+from lib.infrastructure.outbound.orm.config.model import Base
+from sqlalchemy import text
+
+container = Container()
+
+
+def init_db():
+    engine = container.db_engine()
+    print("Initializing database...")
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        conn.commit()
+    Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.execute(text("CREATE INDEX paper_text_search_idx ON papers "
+                          "USING GIN (to_tsvector('english', coalesce(title, '') || ' ' "
+                          "|| coalesce(abstract, '') || ' ' || coalesce(keywords, '')));"))
+    print("Done.")
+
+
+if __name__ == "__main__":
+    init_db()
