@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+import pydantic
 from typing import List, Optional
 from datetime import datetime
 from lib.infrastructure.outbound.orm.config.model import Paper as PaperOrm, PaperChunk as PaperChunkOrm
@@ -11,6 +12,7 @@ class PaperCreate(BaseModel):
     url: Optional[str] = None
     abstract: Optional[str] = None
     conference: Optional[str] = None
+    volume: Optional[str] = None
     keywords: Optional[str] = None
 
     def to_entity(self) -> PaperOrm:
@@ -18,6 +20,7 @@ class PaperCreate(BaseModel):
                           authors=self.authors,
                           abstract=self.abstract,
                           conference=self.conference,
+                          volume=self.volume,
                           publication_date=self.publication_date,
                           url=self.url,
                           keywords=self.keywords)
@@ -34,6 +37,7 @@ class Paper(PaperCreate):
                    authors=entity.authors,
                    abstract=entity.abstract,
                    conference=entity.conference,
+                   volume=entity.volume,
                    publication_date=entity.publication_date,
                    url=entity.url,
                    keywords=entity.keywords,
@@ -42,13 +46,24 @@ class Paper(PaperCreate):
 
     @classmethod
     def from_dict(cls, d: dict) -> "Paper":
-        return Paper(**{k: v for k, v in d.items() if hasattr(Paper, k)})
+        paper = Paper(title=d.get('title'),
+                      authors=d.get('authors'),
+                      abstract=d.get('abstract'),
+                      conference=d.get('conference'),
+                      volume=d.get('volume'),
+                      publication_date=d.get('publication_date'),
+                      url=d.get('url'),
+                      keywords=d.get('keywords'),
+                      created_at=d.get('created_at'),
+                      id=d.get('id'))
+        return paper
 
     def to_entity(self) -> PaperOrm:
         entity = PaperOrm(title=self.title,
                           authors=self.authors,
                           abstract=self.abstract,
                           conference=self.conference,
+                          volume=self.volume,
                           publication_date=self.publication_date,
                           url=self.url,
                           keywords=self.keywords,

@@ -19,6 +19,7 @@ class Paper(Base):
     authors = Column(ARRAY(String), default=[])
     abstract = Column(Text)
     conference = Column(String)
+    volume = Column(String)
     publication_date = Column(TIMESTAMP, nullable=False)
     url = Column(Text, nullable=True)
     keywords = Column(String, default=[])

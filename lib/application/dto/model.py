@@ -11,6 +11,7 @@ class PaperCreateDto(BaseModel):
     url: Optional[str] = None
     abstract: Optional[str] = None
     conference: Optional[str] = None
+    volume: Optional[str] = None
     keywords: Optional[str] = None
 
     def to_entity(self) -> PaperCreate:
@@ -19,6 +20,7 @@ class PaperCreateDto(BaseModel):
                              publication_date=self.publication_date,
                              abstract=self.abstract,
                              conference=self.conference,
+                             volume=self.volume,
                              url=self.url,
                              keywords=self.keywords)
         return entity
@@ -33,6 +35,7 @@ class PaperDto(PaperCreateDto):
                    authors=entity.authors,
                    abstract=entity.abstract,
                    conference=entity.conference,
+                   volume=entity.volume,
                    publication_date=entity.publication_date,
                    url=entity.url,
                    keywords=entity.keywords,
@@ -43,6 +46,7 @@ class PaperDto(PaperCreateDto):
                        authors=self.authors,
                        abstract=self.abstract,
                        conference=self.conference,
+                       volume=self.volume,
                        publication_date=self.publication_date,
                        url=self.url,
                        keywords=self.keywords,

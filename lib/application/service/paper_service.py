@@ -23,13 +23,13 @@ class PaperService(PaperCrudUseCase):
 
     def search(self, query: str) -> List[SearchScorePaperDto]:
         entities = self.paper_repo.text_search(query)
-        return [SearchScorePaperDto.from_entity(e.paper) for e in entities]
+        return [SearchScorePaperDto.from_entity(e) for e in entities]
 
     def find_similar(self, text: str) -> List[SearchScorePaperDto]:
         text_embeddings = self.embedding_service.embeddings(text)
         # TODO: what if there are many embedding chuncks?
         entities = self.paper_repo.similarity_search(text_embeddings[0])
-        return [SearchScorePaperDto.from_entity(e.paper) for e in entities]
+        return [SearchScorePaperDto.from_entity(e) for e in entities]
 
     def add_embedding(self, chunk: PaperChunkDto) -> PaperChunkDto:
         entity = chunk.to_entity()

@@ -10,11 +10,11 @@ from lib.application.ports.inbound.paper_scraper_usecase import PaperScraperUseC
 class NeurIpsScraper(PaperScraperUseCase):
     BASE_URL = "https://proceedings.neurips.cc"
 
-    def __init__(self, year: str):
-        self.year = year
+    def __init__(self, volume: str):
+        self.volume = volume
 
     def extract_links(self, logger: Logger) -> List[str]:
-        index_url = f"{self.BASE_URL}/paper/{self.year}"
+        index_url = f"{self.BASE_URL}/paper/{self.volume}"
 
         logger.info(f"Fetching paper list from {index_url}")
         resp = requests.get(index_url)
@@ -75,7 +75,8 @@ class NeurIpsScraper(PaperScraperUseCase):
                               authors=authors,
                               abstract=abstract,
                               publication_date=datetime.fromisoformat(
-                                  f"{self.year}-12-01"),
+                                  f"{self.volume}-12-01"),
+                              volume=self.volume,
                               url=pdf_url,
                               conference="NeurIPS",
                               keywords="")

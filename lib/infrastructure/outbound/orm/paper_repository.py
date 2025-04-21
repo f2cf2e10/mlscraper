@@ -77,30 +77,35 @@ class SQLAlchemyPaperRepository(PaperRepository):
         return True
 
     def similarity_search(self, embedding: List[float]) -> List[SearchScorePaper]:
-        sql_query = """
-            SELECT
-                pc.*,
-                p.*,"""
         if self.similarity_type == 'cosine':
-            sql_query += """
-                    papers.embedding <=> :query_vector AS similarity_score
+            sql_query = """
+                    SELECT pc.*,p.*,
+                    pc.embedding::vector <=> ('[' || ARRAY_TO_STRING(:query_vector, ',') || ']')::vector AS similarity_score
+                    FROM paper_chunks pc
+                    JOIN papers p ON pc.paper_id = p.id
+                    ORDER BY similarity_score ASC 
+                    LIMIT :limit;     
             """
         elif self.similarity_type == 'euclidean':
-            sql_query += """
-                    papers.embedding <#> :query_vector AS similarity_score
+            sql_query = """
+                    SELECT pc.*,p.*,
+                    pc.embedding::vector <#> ('[' || ARRAY_TO_STRING(:query_vector, ',') || ']')::vector AS similarity_score
+                    FROM paper_chunks pc
+                    JOIN papers p ON pc.paper_id = p.id
+                    ORDER BY similarity_score ASC 
+                    LIMIT :limit;     
             """
         elif self.similarity_type == 'inner_product':
-            sql_query += """
-                    papers.embedding @> :query_vector AS similarity_score
+            sql_query = """
+                    SELECT pc.*,p.*,
+                    pc.embedding::vector @> ('[' || ARRAY_TO_STRING(:query_vector, ',') || ']')::vector AS similarity_score
+                    FROM paper_chunks pc
+                    JOIN papers p ON pc.paper_id = p.id
+                    ORDER BY similarity_score DESC 
+                    LIMIT :limit;     
             """
         else:
             raise ValueError("Unsupported similarity type")
-        sql_query += """
-            FROM paper_chunks pc
-            JOIN papers p ON pc.paper_id = p.id
-            ORDER BY pc.embedding <-> :query_vector
-            LIMIT :limit;
-        """
 
         result = self.db.execute(
             text(sql_query),
@@ -115,7 +120,7 @@ class SQLAlchemyPaperRepository(PaperRepository):
             paper = Paper.from_dict(row._mapping)
             if not paper.id in ids:
                 results += [SearchScorePaper(paper=paper,
-                                             score=row["similarity_score"])]
+                                             score=row._mapping["similarity_score"])]
             if len(results) >= self.top_k:
                 break
         return results
@@ -124,13 +129,13 @@ class SQLAlchemyPaperRepository(PaperRepository):
         sql = text("""
             SELECT *,
               ts_rank_cd(
-                to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '') || ' ' || coalesce(summary, '') || ' ' || array_to_string(keywords, ' ')),
+                to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '') || ' ' || coalesce(keywords, '')),
                 plainto_tsquery('english', :query)
-              ) AS rank
+              ) AS score 
             FROM papers
-            WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '') || ' ' || coalesce(summary, '') || ' ' || array_to_string(keywords, ' '))
+            WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '') || ' ' || coalesce(keywords, ''))
               @@ plainto_tsquery('english', :query)
-            ORDER BY rank DESC
+            ORDER BY score DESC
             LIMIT :top_k;
         """)
 
@@ -138,7 +143,7 @@ class SQLAlchemyPaperRepository(PaperRepository):
         rows = result.fetchall()
 
         return [SearchScorePaper(paper=Paper.from_dict(row._mapping),
-                                 score=row["rank"])
+                                 score=row._mapping["score"])
                 for row in rows]
 
     def delete(self, paper_id: int) -> bool:

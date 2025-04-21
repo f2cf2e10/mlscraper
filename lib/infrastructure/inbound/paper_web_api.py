@@ -2,7 +2,7 @@ import logging
 from typing import List, Literal
 from fastapi import APIRouter, File, HTTPException, Depends, Request, Response, UploadFile
 from app.container import conferences, Container
-from lib.application.dto.model import PaperChunkDto, PaperCreateDto, PaperDto
+from lib.application.dto.model import PaperChunkDto, PaperCreateDto, PaperDto, SearchScorePaperDto
 from lib.application.ports.inbound.embedding_usecase import EmbeddingUseCase
 from lib.application.ports.inbound.paper_crud_usecase import PaperCrudUseCase
 
@@ -19,6 +19,28 @@ async def add(paper: PaperCreateDto,
     try:
         entity = paper_service.add(paper)
         return entity
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/paper/search", response_model=List[SearchScorePaperDto])
+async def search(text: str,
+                 paper_service: PaperCrudUseCase = Depends(
+        lambda: container.paper_service())) -> PaperDto:
+    try:
+        entities = paper_service.search(text)
+        return entities
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/paper/similar", response_model=List[SearchScorePaperDto])
+async def search(text: str,
+                 paper_service: PaperCrudUseCase = Depends(
+        lambda: container.paper_service())) -> PaperDto:
+    try:
+        entities = paper_service.find_similar(text)
+        return entities
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

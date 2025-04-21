@@ -23,26 +23,19 @@ class Conferences(str, Enum):
     NeurIPS = "NeurIPS"
     ICLR = "ICLR"
     PMLR = "PMLR"
+
+
 conferences = ["NeurIPS", "ICLR", "PMLR"]
 
-class Container(containers.DeclarativeContainer):
-    database_url = providers.Singleton(str, os.getenv("DATABASE_URL"))
-    minio_host = providers.Singleton(str, os.getenv("MINIO_HOST"))
-    minio_access_key = providers.Singleton(str, os.getenv("MINIO_ACCESS_KEY"))
-    minio_secret_key = providers.Singleton(str, os.getenv("MINIO_SECRET_KEY"))
-    minio_bucket = providers.Singleton(str, os.getenv("MINIO_BUCKET"))
-    embedding_model = providers.Singleton(str, os.getenv("EMBEDDING_MODEL"))
-    embed_chunk_size = providers.Singleton(
-        int, os.getenv("EMBEDDING_CHUNK_SIZE"))
-    n_pages_to_embed = providers.Singleton(int, os.getenv("EMBEDDING_N_PAGES"))
 
+class Container(containers.DeclarativeContainer):
     # DB
     db_engine = providers.Singleton(
         create_engine,
-        database_url,
+        os.getenv("DATABASE_URL"),
         pool_size=5,  # Pool size for SQLite
         max_overflow=10,  # Allow overflow connections
-        echo=False
+        echo=True
     )
     session_factory = providers.Singleton(
         sessionmaker,
@@ -56,27 +49,35 @@ class Container(containers.DeclarativeContainer):
     )
 
     minio = providers.Singleton(Minio,
-                                minio_host,
-                                access_key=minio_access_key,
-                                secret_key=minio_secret_key,
+                                os.getenv("MINIO_HOST"),
+                                access_key=os.getenv("MINIO_ACCESS_KEY"),
+                                secret_key=os.getenv("MINIO_SECRET_KEY"),
                                 secure=False)
 
     # Providers for services
     paper_repository = providers.Factory(SQLAlchemyPaperRepository, db_session)
-    paper_storage = providers.Factory(MinioPaperStorage, minio, minio_bucket)
+    paper_storage = providers.Factory(
+        MinioPaperStorage, minio, os.getenv("MINIO_BUCKET"))
 
     # Services
     embedding_service = providers.Factory(
-        EmbeddingService, embedding_model, embed_chunk_size, n_pages_to_embed)
+        EmbeddingService, os.getenv("EMBEDDING_MODEL"),
+        int(os.getenv("EMBEDDING_CHUNK_SIZE")),
+        int(os.getenv("EMBEDDING_N_PAGES")))
     paper_service = providers.Factory(
         PaperService, paper_repository, paper_storage, embedding_service)
 
     def _scraper_factory(conference_name: str, year: str) -> PaperScraperUseCase:
         name = conference_name.lower()
+
+        def MyOpenReviewScrapper(year) -> OpenReviewScraper:
+            return OpenReviewScraper(year, os.getenv("OPENREVIEW_USER"),
+                                     os.getenv("OPENREVIEW_PWD"))
+
         SCRAPER_CLASSES: dict[str, Type[PaperScraperUseCase]] = {
             "neurips": NeurIpsScraper,
             "pmlr": PmlrScraper,
-            "iclr": OpenReviewScraper,
+            "iclr": MyOpenReviewScrapper,
         }
         try:
             scraper_cls = SCRAPER_CLASSES[name]
