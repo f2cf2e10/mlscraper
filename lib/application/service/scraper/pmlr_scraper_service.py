@@ -1,110 +1,84 @@
 from datetime import datetime
+from logging import Logger
+import re
 from bs4 import BeautifulSoup
 import requests
 from typing import List, Dict
 
-from lib.application.dto.model import PaperDto
+from lib.application.dto.model import PaperCreateDto, PaperDto
 from lib.application.ports.inbound.paper_scraper_usecase import PaperScraperUseCase
 
 
 class PmlrScraper(PaperScraperUseCase):
-
     BASE_URL = "https://proceedings.mlr.press"
+    conference = "PMLR"
 
-    def __init__(self, year: int):
-        self.year = year
-        self.volumes = self._get_volumes_for_year()
+    def __init__(self, volume: int):
+        self.volume = volume
 
-    def _get_volumes_for_year(self) -> List[str]:
-        resp = requests.get(self.BASE_URL)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+    def extract_links(self, logger: Logger) -> List[str]:
+        index_url = f'{self.BASE_URL}/{self.volume}'
+        logger.info(f"Fetching paper list from {index_url}")
 
-        volumes = []
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            if href.startswith('v') and href.endswith('/'):
-                volume_url = f"{self.BASE_URL}/{href}"
-                volume_year = self._extract_year_from_volume(volume_url)
-                if volume_year == self.year:
-                    volumes.append(volume_url)
-        return volumes
+        response = requests.get(index_url)
+        response.raise_for_status()
 
-    def _extract_year_from_volume(self, volume_url: str) -> int:
-        resp = requests.get(volume_url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        year_tag = soup.find(
-            'meta', attrs={"name": "citation_publication_date"})
-        if year_tag and "content" in year_tag.attrs:
-            date_str = year_tag["content"]
-            year = int(date_str.split("-")[0])
-            return year
-        return -1
+        soup = BeautifulSoup(response.text, 'html.parser')
+        paper_links = []
+        h2_tag = soup.find('h2')
+        if h2_tag:
+            match = re.search(r':\s*(.*?),', h2_tag.get_text())
+            if match:
+                self.conference += f" - {match.group(1).strip()}"
+            match_date = re.search(r'(\d{1,2})\s+(\w+)\s+(\d{4})', h2_tag.get_text())
+            if match_date:
+                day = int(match_date.group(1))
+                month_name = match_date.group(2)
+                year = int(match_date.group(3))
+                month_number = datetime.strptime(month_name, '%B').month
+                self.date = datetime(year, month_number, day)
 
-    def list_papers(self) -> List[PaperDto]:
-        papers = []
-        for volume_url in self.volumes:
-            paper = self._scrape_volume(volume_url)
-            papers.extend(paper)
-        return papers
+        for link in soup.find_all('a', href=True):
+            href = link['href']
 
-    def _scrape_volume(self, volume_url: str) -> List[PaperDto]:
-        resp = requests.get(volume_url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+            if 'proceedings' in href.lower() or 'paper' in href.lower():
+                if not href.startswith('http'):
+                    href = 'https://proceedings.mlr.press' + href
+                if href.endswith('html'):
+                    paper_links.append(href)
 
-        # Find the conference name
-        conf_tag = soup.find('h1')
-        conference = conf_tag.get_text(
-            strip=True) if conf_tag else "Unknown Conference"
+        return paper_links
 
-        papers = []
-        for div in soup.find_all("div", class_="paper"):
-            title_tag = div.find("p", class_="title")
-            authors_tag = div.find("p", class_="authors")
-            abstract_tag = div.find("div", class_="abstract")
-            pdf_link = div.find("a", text="Download PDF")
+    def process_link(self, link: str, logger: Logger) -> PaperCreateDto:
+        logger.info(f"Fetching {link}")
+        response = requests.get(link)
+        response.raise_for_status()
 
-            title = title_tag.get_text(strip=True) if title_tag else ""
-            authors = [a.strip() for a in authors_tag.get_text(
-                strip=True).split(",")] if authors_tag else []
-            abstract = abstract_tag.get_text(
-                strip=True) if abstract_tag else ""
-            pdf_url = self.BASE_URL + pdf_link['href'] if pdf_link else ""
-            paper_url = volume_url  # optional improvement later
+        soup = BeautifulSoup(response.text, 'html.parser')
+        title_tag = soup.find('h1')
+        title = title_tag.get_text(strip=True) if title_tag else 'No title'
 
-            keywords, publication_date = self._scrape_paper_page(
-                paper_url) if paper_url else ([], "")
-            papers.append(PaperDto(
-                title=title,
-                authors=authors,
-                abstract=abstract,
-                conference=conference,
-                url=pdf_url,
-                keywords=keywords,
-                publication_date=publication_date
-            ))
+        authors_tag = soup.find('span', class_='authors')
+        authors = authors_tag.get_text(
+            strip=True).split(",") if authors_tag else [] 
 
-        return papers
+        abstract_tag = soup.find('div', class_='abstract')
+        abstract = abstract_tag.get_text(
+            strip=True) if abstract_tag else None
 
-    def _scrape_paper_page(self, paper_url: str) -> tuple[List[str], str]:
-        if not paper_url:
-            return [], ""
+        pdf = None
+        for link in soup.find_all('a', href=True):
+            if link['href'].lower().endswith('pdf'):
+                pdf = link['href']
+                if not pdf.startswith('http'):
+                    pdf = 'https://proceedings.mlr.press' + pdf
+                break
 
-        resp = requests.get(paper_url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        # Find keywords
-        keywords_meta = soup.find_all(
-            'meta', attrs={"name": "citation_keywords"})
-        keywords = [meta['content']
-                    for meta in keywords_meta] if keywords_meta else []
-
-        # Find publication date
-        pub_date_meta = soup.find(
-            'meta', attrs={"name": "citation_publication_date"})
-        publication_date = pub_date_meta['content'] if pub_date_meta else ""
-
-        return keywords, publication_date
+        return PaperCreateDto(title=title,
+                              authors=authors,
+                              abstract=abstract,
+                              publication_date=self.date,
+                              volume=self.volume,
+                              keywords='',
+                              url=pdf,
+                              conference=self.conference)
